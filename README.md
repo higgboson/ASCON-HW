@@ -18,7 +18,7 @@ New to Ascon or to this code? Start with [`docs/learning_guide.md`](docs/learnin
 
 ## 🎯 100% COVERAGE: EVERY METRIC CLOSED IN CADENCE IMC
 
-![Coverage closure in Cadence IMC: 96.51% before, 100% after](docs/img/coverage_before_after.png)
+<p align="center"><img src="docs/img/coverage_before_after.png" width="100%" alt="Coverage closure in Cadence IMC: 96.51% before, 100% after"></p>
 
 | Metric | Before exclusions | **After exclusions** |
 |---|---|---|
@@ -39,21 +39,21 @@ screenshots: [docs/coverage/README.md](docs/coverage/README.md).**
 
 **1. Toggle holes: padding bits that are constant by design**
 
-![padv toggle bits before and after exclusion](docs/coverage/01_toggle_padv_before_after.png)
+<p align="center"><img src="docs/img/toggle_padv_big.png" width="100%" alt="padv toggle bits before and after exclusion"></p>
 
 **2. Block holes: branches unreachable for the RPC = 1 build**
 
-![block holes explained](docs/coverage/02_block_holes_explained.png)
+<p align="center"><img src="docs/img/block_holes_big.png" width="100%" alt="block holes explained"></p>
 
 ## 🟢 UVM REGRESSION: 9 / 9 TESTS PASS ON CADENCE XCELIUM
 
-![Xcelium regression: 9 of 9 tests passed, 0 failed](docs/img/regression_9_of_9.png)
+<p align="center"><img src="docs/img/regression_9_of_9.png" width="100%" alt="Xcelium regression: 9 of 9 tests passed, 0 failed"></p>
 
 ## 🐞 THE TESTBENCH CATCHES REAL BUGS: 6 / 6 PLANTED BUGS CAUGHT
 
 The bug shown below leaves every output correct, so only an assertion can catch it:
 
-![Planted bug no_wipe caught by SVA a_wiped](docs/img/bug_caught_by_sva.png)
+<p align="center"><img src="docs/img/bug_caught_by_sva.png" width="100%" alt="Planted bug no_wipe caught by SVA a_wiped"></p>
 
 ---
 
