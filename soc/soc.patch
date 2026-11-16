@@ -1,0 +1,154 @@
+diff --git a/code/soc.v b/code/soc.v
+index 8b33c6a..d2ee5f6 100644
+--- a/code/soc.v
++++ b/code/soc.v
+@@ -2,6 +2,12 @@
+ // Board-independent. Each FPGA board has its own small top file that adds the clock,
+ // pins and display (see fpga/).
+ 
++// Rounds per clock cycle of the Ascon core: 1 (smallest), 2, or 4 (fastest).
++// Simulation: make PROG=ascon sim VFLAGS=-DASCON_RPC=4
++`ifndef ASCON_RPC
++`define ASCON_RPC 1
++`endif
++
+ module soc #(
+     parameter CLK_HZ = 50_000_000,
+     parameter BAUD   = 115_200
+@@ -59,12 +65,13 @@ riscv_cpu rvcpu    (clk, core_reset, PC, Instr,
+ 
+ instr_mem instrmem (clk, PC, Instr, ld_imem_we, ld_waddr, ld_wdata);
+ 
+-// Top 4 address bits: 0x1 -> I/O, 0x2 -> matrix accelerator, anything else -> data memory
++// Top 4 address bits: 0x1 -> I/O, 0x2 -> matrix accelerator, 0x3 -> Ascon, anything else -> data memory
+ wire is_mmio  = (DataAdr[31:28] == 4'h1);
+ wire is_accel = (DataAdr[31:28] == 4'h2);
+-wire [31:0] accel_rdata;
++wire is_ascon = (DataAdr[31:28] == 4'h3);
++wire [31:0] accel_rdata, ascon_rdata;
+ 
+-data_mem  datamem  (clk, MemWrite & ~is_mmio & ~is_accel, Store, DataAdr, WriteData, dmem_rdata);
++data_mem  datamem  (clk, MemWrite & ~is_mmio & ~is_accel & ~is_ascon, Store, DataAdr, WriteData, dmem_rdata);
+ 
+ matmul_accel accel (
+     .clk(clk), .reset(core_reset),
+@@ -72,6 +79,12 @@ matmul_accel accel (
+     .rd_data(accel_rdata)
+ );
+ 
++ascon_mmio #(.RPC(`ASCON_RPC)) ascon (
++    .clk(clk), .reset(core_reset),
++    .wr_en(MemWrite & is_ascon), .addr(DataAdr), .wr_data(WriteData),
++    .rd_data(ascon_rdata)
++);
++
+ mmio #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) io (
+     .clk(clk), .reset(core_reset), .uart_reset(reset),
+     .wr_en(MemWrite & is_mmio), .addr(DataAdr), .wr_data(WriteData),
+@@ -83,7 +96,7 @@ mmio #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) io (
+     .tohost(tohost), .tohost_valid(tohost_valid)
+ );
+ 
+-assign ReadData  = is_mmio ? mmio_rdata : is_accel ? accel_rdata : dmem_rdata;
++assign ReadData  = is_mmio ? mmio_rdata : is_accel ? accel_rdata : is_ascon ? ascon_rdata : dmem_rdata;
+ 
+ // While the CPU is in reset, data memory can be written from outside: by a testbench
+ // (Ext_*, e-Yantra) or by the loader. CPU stores are blocked then, so a store that was
+diff --git a/fpga/basys3/build.tcl b/fpga/basys3/build.tcl
+index 5f9610b..43e31f3 100644
+--- a/fpga/basys3/build.tcl
++++ b/fpga/basys3/build.tcl
+@@ -36,7 +36,7 @@ foreach f {imem.hex dmem0.hex dmem1.hex dmem2.hex dmem3.hex} {
+ 
+ # Paths go in as Tcl lists: a plain string with spaces (e.g. "C:/Users/My Name/...")
+ # would be split into several file names
+-read_verilog [glob $root/code/*.v $root/code/components/*.v $root/code/io/*.v $root/code/accel/*.v]
++read_verilog [glob $root/code/*.v $root/code/components/*.v $root/code/io/*.v $root/code/accel/*.v $root/code/ascon/*.v]
+ read_verilog [list "$script_dir/basys3_top.v"]
+ read_xdc     [list "$script_dir/basys3.xdc"]
+ 
+diff --git a/pl_riscv_cpu.qsf b/pl_riscv_cpu.qsf
+index 8ca9807..efde14d 100644
+--- a/pl_riscv_cpu.qsf
++++ b/pl_riscv_cpu.qsf
+@@ -100,6 +100,9 @@ set_global_assignment -name VERILOG_FILE code/io/seven_seg.v
+ set_global_assignment -name VERILOG_FILE code/io/uart_loader.v
+ set_global_assignment -name VERILOG_FILE code/accel/systolic_pe.v
+ set_global_assignment -name VERILOG_FILE code/accel/matmul_accel.v
++set_global_assignment -name VERILOG_FILE code/ascon/ascon_round.v
++set_global_assignment -name VERILOG_FILE code/ascon/ascon_core.v
++set_global_assignment -name VERILOG_FILE code/ascon/ascon_mmio.v
+ set_global_assignment -name SDC_FILE pl_riscv_cpu.sdc
+ set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+ # The top-level debug buses (PC, results, memory bus) are for the testbench, not board pins.
+diff --git a/sw/Makefile b/sw/Makefile
+index 76ccf3e..20da571 100644
+--- a/sw/Makefile
++++ b/sw/Makefile
+@@ -35,12 +35,12 @@ $(OUT)/imem.hex: $(OUT)/$(PROG).elf
+ 	python3 elf2hex.py $< $(OUT) $(OBJCOPY)
+ 
+ sim: $(OUT)/imem.hex
+-	iverilog -g2005 $(VFLAGS) -o $(OUT)/sim ../verif/tb_program.v $(RTL)/*.v $(RTL)/components/*.v $(RTL)/io/*.v $(RTL)/accel/*.v
++	iverilog -g2005 $(VFLAGS) -o $(OUT)/sim ../verif/tb_program.v $(RTL)/*.v $(RTL)/components/*.v $(RTL)/io/*.v $(RTL)/accel/*.v $(RTL)/ascon/*.v
+ 	cd $(OUT) && vvp -n sim
+ 
+ # Prebuilt programs, kept in git so the board can be used without a RISC-V compiler
+ # (sw/load.py and fpga/basys3/build.tcl read them from sw/prebuilt/)
+-PREBUILT = hello bench demo matmul
++PREBUILT = hello bench demo matmul ascon
+ prebuilt:
+ 	for p in $(PREBUILT); do \
+ 	    $(MAKE) -s PROG=$$p && mkdir -p prebuilt/$$p && cp build/$$p/*.hex prebuilt/$$p/ ; \
+diff --git a/verif/run_all.sh b/verif/run_all.sh
+index 24f8a19..97950b2 100644
+--- a/verif/run_all.sh
++++ b/verif/run_all.sh
+@@ -9,7 +9,7 @@ ROOT=$HERE/..
+ echo "== e-Yantra directed testbench"
+ mkdir -p "$HERE/work/eyantra"
+ iverilog -g2005 -o "$HERE/work/eyantra/sim" "$ROOT/.test/tb.v" "$ROOT"/code/*.v \
+-    "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v
++    "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v "$ROOT"/code/ascon/*.v
+ (cd "$ROOT/code" && vvp -n "$HERE/work/eyantra/sim" | grep -E "Faulty|errors" && rm -f results.txt)
+ 
+ echo "== riscv-tests";              "$HERE/run_riscv_tests.sh" "$@" | tail -1
+diff --git a/verif/run_board_tests.sh b/verif/run_board_tests.sh
+index 29e199b..d717d33 100644
+--- a/verif/run_board_tests.sh
++++ b/verif/run_board_tests.sh
+@@ -18,7 +18,7 @@ python3 "$ROOT/sw/load.py" hello --dump "$WORK/hello.pkt" > /dev/null
+ 
+ compile() {   # $1 = folder holding the hex files the "bitstream" starts with
+     iverilog -g2005 -o "$1/sim" "$HERE/tb_basys3.v" "$ROOT/fpga/basys3/basys3_top.v" \
+-        "$ROOT"/code/*.v "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v
++        "$ROOT"/code/*.v "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v "$ROOT"/code/ascon/*.v
+ }
+ 
+ pass=0; fail=0
+diff --git a/verif/run_random.sh b/verif/run_random.sh
+index c012e77..e82c68a 100755
+--- a/verif/run_random.sh
++++ b/verif/run_random.sh
+@@ -16,7 +16,7 @@ RTL=$HERE/../code
+ WORK=$HERE/work
+ 
+ mkdir -p "$WORK"
+-iverilog -g2005 $VFLAGS -o "$WORK/rsim" "$HERE/tb_random.v" "$RTL"/*.v "$RTL"/components/*.v "$RTL"/io/*.v "$RTL"/accel/*.v
++iverilog -g2005 $VFLAGS -o "$WORK/rsim" "$HERE/tb_random.v" "$RTL"/*.v "$RTL"/components/*.v "$RTL"/io/*.v "$RTL"/accel/*.v "$RTL"/ascon/*.v
+ cd "$WORK"
+ 
+ pass=0; fail=0; total=0
+diff --git a/verif/run_riscv_tests.sh b/verif/run_riscv_tests.sh
+index 3795b94..8b199cb 100755
+--- a/verif/run_riscv_tests.sh
++++ b/verif/run_riscv_tests.sh
+@@ -26,7 +26,7 @@ if [ ! -d "$TESTS/isa" ]; then
+ fi
+ 
+ mkdir -p "$WORK"
+-iverilog -g2005 $VFLAGS -o "$WORK/sim" "$HERE/tb_program.v" "$ROOT"/code/*.v "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v
++iverilog -g2005 $VFLAGS -o "$WORK/sim" "$HERE/tb_program.v" "$ROOT"/code/*.v "$ROOT"/code/components/*.v "$ROOT"/code/io/*.v "$ROOT"/code/accel/*.v "$ROOT"/code/ascon/*.v
+ 
+ pass=0; fail=0
+ for t in "$TESTS"/isa/rv32ui/*.S "$TESTS"/isa/rv32um/*.S; do

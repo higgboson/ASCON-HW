@@ -1,0 +1,10 @@
+# test                seed        operations per sequence
+ascon_corner_test     1           1
+ascon_rand_test       1           400
+ascon_rand_test       2           400
+ascon_tamper_test     11          300
+ascon_b2b_test        21          300
+ascon_stall_test      31          300
+ascon_poke_test       41          200
+ascon_reset_test      51          200
+ascon_full_test       61          200

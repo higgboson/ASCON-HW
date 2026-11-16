@@ -1,0 +1,13 @@
+{
+    "DESIGN_NAME": "ascon_mmio",
+    "VERILOG_FILES": [
+        "dir::../../rtl/ascon_round.v",
+        "dir::../../rtl/ascon_core.v",
+        "dir::../../rtl/ascon_mmio.v"
+    ],
+    "SYNTH_PARAMETERS": ["RPC=1"],
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 20,
+    "FP_CORE_UTIL": 40,
+    "PL_TARGET_DENSITY_PCT": 50
+}

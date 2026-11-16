@@ -1,0 +1,14 @@
+# simulation and synthesis output
+verif/work/
+verif/uvm/sim/obj_*/
+verif/uvm/sim/logs/
+verif/uvm/sim/cov_work/
+verif/uvm/sim/reports/
+verif/uvm/sim/xcelium*.d/
+verif/uvm/sim/xrun.*
+verif/uvm/sim/waves.*
+verif/uvm/sim/.simvision/
+syn/logs/
+asic/*/runs/
+# clean copy kept while a bug is planted (verif/inject_bug.py)
+rtl/*.orig
