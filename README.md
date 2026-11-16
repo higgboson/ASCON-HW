@@ -12,6 +12,51 @@ the testbench catches them. It also runs as a memory-mapped peripheral of the
 
 New to Ascon or to this code? Start with [`docs/learning_guide.md`](docs/learning_guide.md).
 
+---
+
+# ✅ VERIFICATION SIGN-OFF
+
+## 🎯 100% COVERAGE: EVERY METRIC CLOSED IN CADENCE IMC
+
+![Coverage closure in Cadence IMC: 96.51% before, 100% after](docs/img/coverage_before_after.png)
+
+| Metric | Before exclusions | **After exclusions** |
+|---|---|---|
+| **Overall (items covered)** | 10,792 / 11,182 (96.51%) | **10,792 / 10,792 (100%)** |
+| Block | 99.11% | **100%** |
+| Toggle | 97.74% | **100%** |
+| Expression · FSM | 100% | **100%** |
+| Assertions (16 SVA + 9 cover properties) | 100% | **100%** |
+| Covergroups (6 groups, 347 bins) | 100% | **100%** |
+
+### 🔍 HOW IT REACHED 100%: NOTHING WAS HIDDEN
+
+Every one of the 390 excluded items was checked by hand in the source view and is either
+a bit that is constant by design or code that cannot run in this build. The exclusions are
+saved in a refinement file (`verif/uvm/sim/ascon_exclusions.vRefine`), so anyone can load
+them and see exactly what was excluded. **Full step-by-step walkthrough with 7 annotated
+screenshots: [docs/coverage/README.md](docs/coverage/README.md).**
+
+**1. Toggle holes: padding bits that are constant by design**
+
+![padv toggle bits before and after exclusion](docs/coverage/01_toggle_padv_before_after.png)
+
+**2. Block holes: branches unreachable for the RPC = 1 build**
+
+![block holes explained](docs/coverage/02_block_holes_explained.png)
+
+## 🟢 UVM REGRESSION: 9 / 9 TESTS PASS ON CADENCE XCELIUM
+
+![Xcelium regression: 9 of 9 tests passed, 0 failed](docs/img/regression_9_of_9.png)
+
+## 🐞 THE TESTBENCH CATCHES REAL BUGS: 6 / 6 PLANTED BUGS CAUGHT
+
+The bug shown below leaves every output correct, so only an assertion can catch it:
+
+![Planted bug no_wipe caught by SVA a_wiped](docs/img/bug_caught_by_sva.png)
+
+---
+
 ## Results
 
 | | |
