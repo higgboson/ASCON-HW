@@ -1,0 +1,6 @@
+# Third-party code: the official Ascon reference implementation (ascon-c by the Ascon team).
+# Used as the golden model (DPI-C) and as the software baseline; not part of this design.
+ref/ascon-c/**                         linguist-vendored
+soc/sw/programs/ascon/ascon-c/**       linguist-vendored
+# Generated test-vector files
+kat/**                                 linguist-generated
